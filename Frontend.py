@@ -1,6 +1,8 @@
 import streamlit as st
 import random
 import time
+from Services.prompt_generation import generate_prompt_with_problem_statement
+from Services.services import build_bot, chat_with_query_engine
 
 # Set page configuration
 st.set_page_config(page_title="Custom Streamlit Application", layout="wide")
@@ -19,6 +21,35 @@ api_keys = {
     "pinecone_region": pinecone_region
 }
 
+# Initialize session state variables at the very beginning
+if "prompt_text" not in st.session_state:
+    st.session_state["prompt_text"] = ""
+
+if "chunk_size" not in st.session_state:
+    st.session_state["chunk_size"] = "300"
+
+if "distance_metric" not in st.session_state:
+    st.session_state["distance_metric"] = "Cosine"
+
+if "reranker_topk" not in st.session_state:
+    st.session_state["reranker_topk"] = "Cohere"
+
+if "embedding_model" not in st.session_state:
+    st.session_state["embedding_model"] = "text-embedding-3-small"
+
+if "llm_model" not in st.session_state:
+    st.session_state["llm_model"] = "gpt-4o"
+
+if "language" not in st.session_state:
+    st.session_state["language"] = "English"
+
+if "settings_confirmed" not in st.session_state:
+    st.session_state.settings_confirmed = False
+
+# Initialize chat history
+if "messages" not in st.session_state:
+    st.session_state.messages = []
+
 # 1. Problem Statement
 st.header("1. Problem Statement")
 problem_statement = st.text_input("Enter the problem statement:")
@@ -35,7 +66,7 @@ build_option = st.radio(
 
 # 3. Prompt
 st.header("3. Prompt")
-prompt_text = st.text_area("Enter your prompt:")
+prompt_text = st.text_area("Enter your prompt:", value=st.session_state["prompt_text"])
 generate_prompt = st.button("Generate Prompt")
 
 # 4. Chunk Size
@@ -76,7 +107,7 @@ reranker_topk = st.radio(
 
 # 7. Embedding Model
 st.header("7. Embedding Model")
-embedding_model_options = ["Test-embedding-3-small", "Test-embedding-3-large"]
+embedding_model_options = ["text-embedding-3-small", "text-embedding-3-large"]
 embedding_model = st.radio(
     "Select embedding model:",
     embedding_model_options,
@@ -110,12 +141,14 @@ language = st.radio(
     label_visibility='collapsed'
 )
 
+confirm_settings = st.button("Confirm Settings")
+
 # Create the bot_config dictionary
 bot_config = {
     "problem_statement": problem_statement,
     "build_option": build_option,
     "prompt_text": prompt_text,
-    "chunk_size": chunk_size,
+    "chunk_size": int(chunk_size),
     "distance_metric": distance_metric,
     "reranker_topk": reranker_topk,
     "embedding_model": embedding_model,
@@ -126,47 +159,69 @@ bot_config = {
 # 10. Chat Bot Box
 st.header("10. Chat Bot")
 
-# Initialize chat history
-if "messages" not in st.session_state:
-    st.session_state.messages = []
+# -----------------------------------------------------------------------------
+# Create a placeholder and a function to render the chat in one place.
+chat_placeholder = st.empty()
 
-# Function to simulate streaming response
-def response_generator():
-    response = random.choice(
-        [
-            "Hello there! How can I assist you today?",
-            "Hi! Is there anything I can help you with?",
-            "Do you need assistance with something?",
-        ]
-    )
-    for word in response.split():
-        yield word + " "
-        time.sleep(0.1)  # Adjust the sleep time for faster or slower typing effect
+# def render_chat():
+#     """
+#     Clear the placeholder, then re-render the entire conversation.
+#     """
+chat_placeholder.empty()
+with chat_placeholder.container():
+    for message in st.session_state.messages:
+        with st.chat_message(message["role"]):
+            st.markdown(message["content"])
+# -----------------------------------------------------------------------------
 
-# Display chat messages from history on app rerun
-for message in st.session_state.messages:
-    with st.chat_message(message["role"]):
-        st.markdown(message["content"])
+# If the user clicks "Generate Prompt", call your prompt-generation function.
+if generate_prompt:
+    api_key = api_keys["openai_api_key"]
+    problem_stmt = bot_config['problem_statement']
+    bot_type = bot_config["build_option"]
+    # Generate new prompt
+    result = generate_prompt_with_problem_statement(api_key, problem_stmt, bot_type)
+
+    # Update session_state and re-run
+    st.session_state["prompt_text"] = result
+    bot_config["prompt_text"] = result
+    st.rerun()
+
+# Once settings are confirmed, build the bot and store in session
+if confirm_settings:
+    bot = build_bot(bot_config, api_keys)
+    st.session_state.bot = bot
+    st.session_state.settings_confirmed = True
+    st.success("Settings confirmed. You can now start chatting.")
 
 # Accept user input
-if prompt := st.chat_input("Type your message here..."):
-    # Add user message to chat history
-    st.session_state.messages.append({"role": "user", "content": prompt})
+user_input = st.chat_input("Type your message here...")
 
-    # Display user message in chat message container
-    with st.chat_message("user"):
-        st.markdown(prompt)
+if user_input:
+    # If settings are not confirmed, warn the user
+    if not st.session_state.settings_confirmed:
+        assistant_message = "Please confirm settings before chatting."
+        st.session_state.messages.append({"role": "assistant", "content": assistant_message})
+    else:
+        # Add user message
+        st.session_state.messages.append({"role": "user", "content": user_input})
+        # Generate response from the bot
+        bot = st.session_state.get("bot", None)
+        if bot:
+            response = chat_with_query_engine(bot, user_input)
+            st.session_state.messages.append({"role": "assistant", "content": response})
+        else:
+            # If for some reason the bot wasn't built
+            response = "Bot not built yet. Please confirm settings."
+            st.session_state.messages.append({"role": "assistant", "content": response})
 
-    # Generate and display assistant response
-    with st.chat_message("assistant"):
-        message_placeholder = st.empty()
-        full_response = ""
-        for chunk in response_generator():
-            full_response += chunk
-            message_placeholder.markdown(full_response + "▌")
-        message_placeholder.markdown(full_response)
-    # Add assistant response to chat history
-    st.session_state.messages.append({"role": "assistant", "content": full_response})
-    print(st.session_state)
-    # print(bot_config)
-    # print(api_keys)
+    # Re-render chat with all messages
+    # render_chat()
+# else:
+#     # If no new user input, just render the existing chat as-is
+#     render_chat()
+chat_placeholder.empty()
+with chat_placeholder.container():
+    for message in st.session_state.messages:
+        with st.chat_message(message["role"]):
+            st.markdown(message["content"])
