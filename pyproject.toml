@@ -6,8 +6,12 @@ authors = [
     {name = "abulaalafareh",email = "abul.aala.fareh@gmail.com"}
 ]
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.11,<4.0"
 dependencies = [
+    "loguru (>=0.7.3,<0.8.0)",
+    "cohere (>=5.14.0,<6.0.0)",
+    "torch (>=2.6.0,<3.0.0)",
+    "sentence-transformers (>=3.4.1,<4.0.0)"
 ]
 
 
