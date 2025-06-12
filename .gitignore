@@ -1,0 +1,9 @@
+lib-venv
+*.pyc
+pylint*.txt
+poetry*
+.env
+test.ipynb
+test.py
+todo.txt
+venv

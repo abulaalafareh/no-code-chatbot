@@ -1,8 +1,8 @@
 1. load documents          Done
 2. chunk documents         Done
 3. embed documents         Done
-4. distance metrics
+4. distance metrics        Done
 6. reranking
 7. llm model               Done
-8. language
-9. prompt creation
+8. language                Done 
+9. prompt creation         Done

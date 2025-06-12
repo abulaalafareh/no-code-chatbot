@@ -10,8 +10,7 @@ def generate_prompt_with_problem_statement(api_key, problem_statement, type):
             Instruct the assistant on how to approach and answer the problem effectively.
             use "type" to create a prompt according to use case, type will either be 'RAG' or 'Simple LLM Bot'
             if type is 'RAG' then user will provide his own data and question and the question will be answered using that data
-            if the data does not have relevant information to answer the question then add a line in prompt to say I dont Know in such
-            cases.
+            DONT say I dont know, instead chat with the user if the data provided by user does not relate to the question.
             If type is 'simple LLM Bot' then the conversation will be with AI assistant on any topic mentioned in problem statement.
 
     return your response in JSON format:

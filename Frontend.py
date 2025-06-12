@@ -2,7 +2,9 @@ import streamlit as st
 import random
 import time
 from Services.prompt_generation import generate_prompt_with_problem_statement
-from Services.services import build_bot, chat_with_query_engine
+from Services.services import build_bot, chat_with_query_engine, build_instant_rag, invoke_chain
+import tempfile
+import os
 
 # Set page configuration
 st.set_page_config(page_title="Custom Streamlit Application", layout="wide")
@@ -141,6 +143,22 @@ language = st.radio(
     label_visibility='collapsed'
 )
 
+# 10. Document Upload
+st.header("10. Upload Your Document")
+uploaded_file = st.file_uploader(
+    label="Choose a PDF, TXT, DOCX, or CSV",
+    type=["pdf", "txt", "docx", "csv"]
+)
+
+if uploaded_file is not None:
+    # Show a message with the filename
+    st.success(f"File '{uploaded_file.name}' uploaded!")
+    # You can also display basic info, e.g. size in KB:
+    file_size_kb = uploaded_file.size / 1024
+    st.write(f"Size: {file_size_kb:.1f} KB")
+else:
+    st.info("No file uploaded yet.")
+
 confirm_settings = st.button("Confirm Settings")
 
 # Create the bot_config dictionary
@@ -153,7 +171,8 @@ bot_config = {
     "reranker_topk": reranker_topk,
     "embedding_model": embedding_model,
     "llm_model": llm_model,
-    "language": language
+    "language": language,
+    "top_k": 5  # Default value, can be adjusted later
 }
 
 # 10. Chat Bot Box
@@ -189,10 +208,20 @@ if generate_prompt:
 
 # Once settings are confirmed, build the bot and store in session
 if confirm_settings:
-    bot = build_bot(bot_config, api_keys)
-    st.session_state.bot = bot
-    st.session_state.settings_confirmed = True
-    st.success("Settings confirmed. You can now start chatting.")
+    if uploaded_file is None:
+        st.error("Please upload a document before confirming settings.")
+    else:
+        with tempfile.TemporaryDirectory() as tmpdirname:
+            temp_path = os.path.join(tmpdirname, uploaded_file.name)
+            # Write the uploaded bytes to a file
+            with open(temp_path, "wb") as f:
+                f.write(uploaded_file.getbuffer())
+
+            chain, retriever = build_instant_rag(bot_config, api_keys, temp_path)
+            st.session_state.chain = chain
+            st.session_state.retriever = retriever
+            st.session_state.settings_confirmed = True
+            st.success("Settings confirmed. You can now start chatting.")
 
 # Accept user input
 user_input = st.chat_input("Type your message here...")
@@ -206,9 +235,10 @@ if user_input:
         # Add user message
         st.session_state.messages.append({"role": "user", "content": user_input})
         # Generate response from the bot
-        bot = st.session_state.get("bot", None)
-        if bot:
-            response = chat_with_query_engine(bot, user_input)
+        chain = st.session_state.get("chain", None)
+        retriever = st.session_state.get("retriever", None)
+        if chain and retriever:
+            response = invoke_chain(chain, retriever, bot_config, user_input, api_keys)
             st.session_state.messages.append({"role": "assistant", "content": response})
         else:
             # If for some reason the bot wasn't built

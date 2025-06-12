@@ -185,6 +185,18 @@ files = [
 ]
 
 [[package]]
+name = "docx2txt"
+version = "0.9"
+description = "A pure python-based utility to extract text and images from docx files."
+optional = false
+python-versions = "*"
+groups = ["main"]
+files = [
+    {file = "docx2txt-0.9-py3-none-any.whl", hash = "sha256:e3718c0653fd6f2fcf4b51b02a61452ad1c38a4c163bcf0a6fd9486cd38f529a"},
+    {file = "docx2txt-0.9.tar.gz", hash = "sha256:18013f6229b14909028b19aa7bf4f8f3d6e4632d7b089ab29f7f0a4d1f660e28"},
+]
+
+[[package]]
 name = "fastavro"
 version = "1.10.0"
 description = "Fast read/write of AVRO files"
@@ -1765,4 +1777,4 @@ dev = ["black (>=19.3b0) ; python_version >= \"3.6\"", "pytest (>=4.6.2)"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.11,<4.0"
-content-hash = "dadc508bc10f5fe19f6b5afcc9a23fee7526e41f8bc92b4effa5499f9f0c8ea9"
+content-hash = "93163bda4293c3ba7910360320837a5bab5dc495416d546125d728555b2e7005"
